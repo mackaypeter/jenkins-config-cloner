@@ -36,6 +36,11 @@ import org.kohsuke.args4j.Option;
 import org.unix4j.Unix4j;
 import org.unix4j.builder.Unix4jCommandBuilder;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.KeyManagementException;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -77,6 +82,9 @@ public abstract class TransferHandler implements Handler {
             });
         }
     }
+
+    @Option(name = "-l", aliases = { "--local-copy" }, usage = "Specify a directory for local copy storage.")
+    protected String localLibrary = "";
 
     protected final ConfigTransfer config;
 
@@ -120,6 +128,38 @@ public abstract class TransferHandler implements Handler {
         final String destJob = destination.entity();
 
         final String xmlString = getXml(fixupConfig(xml.stdout(), destination), response);
+
+        if (!localLibrary.isEmpty()) {
+            if (!Files.isDirectory(Paths.get(localLibrary))) {
+                System.err.println("Library directory " + localLibrary + " doesn't exist.");
+                System.out.println("Library directory " + localLibrary + " doesn't exist.");
+            } else {
+                String jenkinsUrlString = destination.jenkins().toString();
+                String jenkinsName = jenkinsUrlString.substring(jenkinsUrlString.indexOf("//")+2,
+                    jenkinsUrlString.indexOf("."));
+                Path jenkinsLibraryPath = Paths.get(localLibrary, jenkinsName);
+                if (!Files.isDirectory(jenkinsLibraryPath)) {
+                    if (!Files.exists(jenkinsLibraryPath)) {
+                        try {
+                            Files.createDirectory(jenkinsLibraryPath);
+                        } catch (IOException ex) {
+                            System.err.println("Could not create " + jenkinsLibraryPath + ": " + ex.getMessage());
+                            System.out.println("Could not create " + jenkinsLibraryPath + ": " + ex.getMessage());
+                        }
+                    } else {
+                        System.err.println("Library directory " + jenkinsLibraryPath + "doesn't exist.");
+                        System.out.println("Library directory " + jenkinsLibraryPath + "doesn't exist.");
+                    }
+                }
+                // create the actual file
+                try (FileWriter writer = new FileWriter(Files.createFile(Paths.get(jenkinsLibraryPath.toString(), destJob)).toFile())) {
+                    writer.write(xmlString);
+                } catch (Exception ex) {
+                    System.err.println("Creating local copy of job configuration failed:" + ex.getMessage());
+                    System.out.println("Creating local copy of job configuration failed:" + ex.getMessage());
+                }
+            }
+        }
 
         if (dryRun) return response.returnCode(0);
 

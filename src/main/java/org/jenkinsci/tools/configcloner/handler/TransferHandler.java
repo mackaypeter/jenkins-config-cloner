@@ -163,20 +163,22 @@ public abstract class TransferHandler implements Handler {
             String jenkinsUrlString = destination.jenkins().toString();
             String jenkinsName = jenkinsUrlString.substring(jenkinsUrlString.indexOf("//")+2,
                 jenkinsUrlString.indexOf("."));
-            Path jenkinsLibraryPath = Paths.get(localLibrary, jenkinsName);
-            if (!Files.isDirectory(jenkinsLibraryPath)) {
-                if (!Files.exists(jenkinsLibraryPath)) {
-                    try {
-                        Files.createDirectory(jenkinsLibraryPath);
-                    } catch (IOException ex) {
-                        System.err.println("Could not create " + jenkinsLibraryPath + ": " + ex.getMessage());
-                        System.out.println("Could not create " + jenkinsLibraryPath + ": " + ex.getMessage());
-                    }
-                } else {
-                    System.err.println("Library directory " + jenkinsLibraryPath + "doesn't exist.");
-                    System.out.println("Library directory " + jenkinsLibraryPath + "doesn't exist.");
-                }
+            Path jenkinsLibraryPath = Paths.get(localLibrary, jenkinsName, "jobs");
+
+            if (Files.exists(jenkinsLibraryPath) && !Files.isDirectory(jenkinsLibraryPath)) {
+                System.err.println(jenkinsLibraryPath + " already exists and is not a directory.");
+                System.out.println(jenkinsLibraryPath + " already exists and is not a directory.");
+                return;
             }
+
+            try {
+                Files.createDirectories(jenkinsLibraryPath);
+            } catch (IOException ex) {
+                System.err.println("Creating local copy of job configuration failed:" + ex.getMessage());
+                System.out.println("Creating local copy of job configuration failed:" + ex.getMessage());
+                return;
+            }
+
             // create the actual file
             try (FileWriter writer =
                      new FileWriter(Files.createFile(Paths.get(jenkinsLibraryPath.toString(), destination.entity())).toFile())

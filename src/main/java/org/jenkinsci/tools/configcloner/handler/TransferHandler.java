@@ -56,7 +56,7 @@ import javax.net.ssl.TrustManager;
 public abstract class TransferHandler implements Handler {
 
     @Argument(multiValued = true, usage = "[<SRC>] [<DST>...]", metaVar = "URLS")
-    private List<String> entities = new ArrayList<String>();
+    protected List<String> entities = new ArrayList<String>();
 
     @Option(name = "-f", aliases = { "--force" }, usage = "Overwrite target configuration if exists")
     protected boolean force = false;
@@ -130,35 +130,8 @@ public abstract class TransferHandler implements Handler {
         final String xmlString = getXml(fixupConfig(xml.stdout(), destination), response);
 
         if (!localLibrary.isEmpty()) {
-            if (!Files.isDirectory(Paths.get(localLibrary))) {
-                System.err.println("Library directory " + localLibrary + " doesn't exist.");
-                System.out.println("Library directory " + localLibrary + " doesn't exist.");
-            } else {
-                String jenkinsUrlString = destination.jenkins().toString();
-                String jenkinsName = jenkinsUrlString.substring(jenkinsUrlString.indexOf("//")+2,
-                    jenkinsUrlString.indexOf("."));
-                Path jenkinsLibraryPath = Paths.get(localLibrary, jenkinsName);
-                if (!Files.isDirectory(jenkinsLibraryPath)) {
-                    if (!Files.exists(jenkinsLibraryPath)) {
-                        try {
-                            Files.createDirectory(jenkinsLibraryPath);
-                        } catch (IOException ex) {
-                            System.err.println("Could not create " + jenkinsLibraryPath + ": " + ex.getMessage());
-                            System.out.println("Could not create " + jenkinsLibraryPath + ": " + ex.getMessage());
-                        }
-                    } else {
-                        System.err.println("Library directory " + jenkinsLibraryPath + "doesn't exist.");
-                        System.out.println("Library directory " + jenkinsLibraryPath + "doesn't exist.");
-                    }
-                }
-                // create the actual file
-                try (FileWriter writer = new FileWriter(Files.createFile(Paths.get(jenkinsLibraryPath.toString(), destJob)).toFile())) {
-                    writer.write(xmlString);
-                } catch (Exception ex) {
-                    System.err.println("Creating local copy of job configuration failed:" + ex.getMessage());
-                    System.out.println("Creating local copy of job configuration failed:" + ex.getMessage());
-                }
-            }
+            createLocalCopy(xmlString, destination);
+
         }
 
         if (dryRun) return response.returnCode(0);
@@ -182,7 +155,41 @@ public abstract class TransferHandler implements Handler {
         );
     }
 
-    private String getXml(String rawXml, CommandResponse response) {
+    protected void createLocalCopy(String xmlString, ConfigDestination destination) {
+        if (!Files.isDirectory(Paths.get(localLibrary))) {
+            System.err.println("Library directory " + localLibrary + " doesn't exist.");
+            System.out.println("Library directory " + localLibrary + " doesn't exist.");
+        } else {
+            String jenkinsUrlString = destination.jenkins().toString();
+            String jenkinsName = jenkinsUrlString.substring(jenkinsUrlString.indexOf("//")+2,
+                jenkinsUrlString.indexOf("."));
+            Path jenkinsLibraryPath = Paths.get(localLibrary, jenkinsName);
+            if (!Files.isDirectory(jenkinsLibraryPath)) {
+                if (!Files.exists(jenkinsLibraryPath)) {
+                    try {
+                        Files.createDirectory(jenkinsLibraryPath);
+                    } catch (IOException ex) {
+                        System.err.println("Could not create " + jenkinsLibraryPath + ": " + ex.getMessage());
+                        System.out.println("Could not create " + jenkinsLibraryPath + ": " + ex.getMessage());
+                    }
+                } else {
+                    System.err.println("Library directory " + jenkinsLibraryPath + "doesn't exist.");
+                    System.out.println("Library directory " + jenkinsLibraryPath + "doesn't exist.");
+                }
+            }
+            // create the actual file
+            try (FileWriter writer =
+                     new FileWriter(Files.createFile(Paths.get(jenkinsLibraryPath.toString(), destination.entity())).toFile())
+            ) {
+                writer.write(xmlString);
+            } catch (Exception ex) {
+                System.err.println("Creating local copy of job configuration failed:" + ex.getMessage());
+                System.out.println("Creating local copy of job configuration failed:" + ex.getMessage());
+            }
+        }
+    }
+
+    protected String getXml(String rawXml, CommandResponse response) {
 
         if (expressions.isEmpty()) return rawXml;
 

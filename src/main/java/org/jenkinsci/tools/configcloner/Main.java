@@ -26,6 +26,7 @@ package org.jenkinsci.tools.configcloner;
 import org.jenkinsci.tools.configcloner.handler.CloneJob;
 import org.jenkinsci.tools.configcloner.handler.CloneNode;
 import org.jenkinsci.tools.configcloner.handler.CloneView;
+import org.jenkinsci.tools.configcloner.handler.DownloadJob;
 import org.jenkinsci.tools.configcloner.handler.Handler;
 import org.jenkinsci.tools.configcloner.handler.InvalidUsage;
 import org.jenkinsci.tools.configcloner.handler.Recipe;
@@ -72,6 +73,7 @@ public class Main {
         addCommand(new CloneView(config));
         addCommand(new CloneNode(config));
         addCommand(new Recipe(config, cliPool));
+        addCommand(new DownloadJob(config));
     }
 
     private void addCommand(final Handler handler) {

@@ -28,16 +28,21 @@ import org.jenkinsci.tools.configcloner.CommandResponse;
 import org.jenkinsci.tools.configcloner.ConfigDestination;
 import org.jenkinsci.tools.configcloner.ConfigTransfer;
 import org.jenkinsci.tools.configcloner.UrlParser;
+import org.jenkinsci.tools.configcloner.library.JenkinsLibrary;
 
+import java.io.IOException;
 import java.net.URL;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class DownloadJob extends TransferHandler {
+public class UpdateJob extends TransferHandler {
 
-    public DownloadJob(final ConfigTransfer config) {
+    JenkinsLibrary jenkins;
+
+    public UpdateJob(final ConfigTransfer config) {
 
         super(config);
     }
@@ -51,13 +56,37 @@ public class DownloadJob extends TransferHandler {
         }
 
         // Get both of these before doing any work to fail validation early.
-        final List<ConfigDestination> sources = this.sources();
+        final List<ConfigDestination> destinations = this.destinations();
 
-        for (ConfigDestination source : sources) {
-            download(source, response);
+        for (ConfigDestination destination : destinations) {
+            update(destination, response);
         }
 
         return response;
+    }
+
+    private CommandResponse update(
+        final ConfigDestination destination,
+        final CommandResponse response
+    ) {
+
+        System.out.println("Updating job " + destination);
+        final String jobName = destination.entity();
+        final String xmlString;
+        try {
+            xmlString = jenkins.getJobXml(jobName);
+        } catch (IOException e) {
+            response.err().println("Unable to get local configuration for " + jobName);
+            return response;
+        }
+
+        if (dryRun) return response.returnCode(0);
+
+        final CommandResponse.Accumulator updateResponse = config.execute(
+            destination, xmlString, this.updateCommandName(), jobName
+        );
+
+        return response.merge(updateResponse);
     }
 
     private CommandResponse download(
@@ -66,17 +95,17 @@ public class DownloadJob extends TransferHandler {
     ) {
 
         response.out().println("Fetching " + source);
-        final CommandResponse.Accumulator downloadResponse = config.execute(
+        final CommandResponse.Accumulator xml = config.execute(
             source, "", this.getCommandName(), source.entity()
         );
 
-        if (!downloadResponse.succeeded()) return response.merge(downloadResponse);
+        if (!xml.succeeded()) return response.merge(xml);
 
-        final String xmlString = getXml(fixupConfig(downloadResponse.stdout(), source), response);
+        final String xmlString = getXml(fixupConfig(xml.stdout(), source), response);
 
         createLocalCopy(xmlString, source);
 
-        return response.returnCode(0);
+        return response;
     }
 
     @Override
@@ -99,15 +128,24 @@ public class DownloadJob extends TransferHandler {
         return "delete-job";
     }
 
-    protected List<ConfigDestination> sources() {
-        if (entities == null || entities.size() < 1) throw new IllegalArgumentException(
-            "Expecting 1 or more positional arguments"
+    protected List<ConfigDestination> destinations() {
+        if (entities == null || entities.size() < 2) throw new IllegalArgumentException(
+            "Expecting 2 or more positional arguments"
         );
-        List<ConfigDestination> sources = new ArrayList<>();
-        for (String entity : entities) {
-            sources.add(urlParser().destination(entity));
+        List<ConfigDestination> destinations = new ArrayList<>();
+
+        try {
+            jenkins = new JenkinsLibrary(Paths.get(localLibrary, entities.get(0)));
+        } catch (IOException e) {
+            throw new RuntimeException("Could not load local jenkins library: ", e);
         }
-        return sources;
+
+        String jenkinsUrl = jenkins.getUrl();
+        entities.subList(1, entities.size()).stream()
+            .forEach(e -> destinations.add(urlParser().destination(jenkinsUrl+"::"+e)));
+
+
+        return destinations;
     }
 
     @Override
@@ -132,24 +170,24 @@ public class DownloadJob extends TransferHandler {
     }
 
     public String name() {
-        return "download-job";
+        return "update-job";
     }
 
     public String description() {
-        return "Download job configuration from <SRC>";
+        return "Update job configuration int <DEST> with the configuration from local library";
     }
 
-    public DownloadJob setEntites(List<String> entites) {
+    public UpdateJob setEntites(List<String> entites) {
         this.entities = entites;
         return this;
     }
 
-    public DownloadJob setLocalLibraryDir(String localLibrary) {
+    public UpdateJob setLocalLibraryDir(String localLibrary) {
         this.localLibrary = localLibrary;
         return this;
     }
 
-    public DownloadJob setForce(boolean force) {
+    public UpdateJob setForce(boolean force) {
         this.force = force;
         return this;
     }

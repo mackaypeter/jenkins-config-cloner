@@ -38,6 +38,7 @@ import org.unix4j.builder.Unix4jCommandBuilder;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -163,7 +164,27 @@ public abstract class TransferHandler implements Handler {
             String jenkinsUrlString = destination.jenkins().toString();
             String jenkinsName = jenkinsUrlString.substring(jenkinsUrlString.indexOf("//")+2,
                 jenkinsUrlString.indexOf("."));
-            Path jenkinsLibraryPath = Paths.get(localLibrary, jenkinsName, "jobs");
+
+            Path jenkinsPath = Paths.get(localLibrary, jenkinsName);
+            Path jenkinsLibraryPath = jenkinsPath.resolve("jobs");
+            Path jenkinsPropertiesPath = jenkinsPath.resolve("jenkins.properties");
+
+            // TODO: Util method
+            if (Files.exists(jenkinsPath) && !Files.isDirectory(jenkinsPath)) {
+                System.err.println(jenkinsPath + " already exists and is not a directory.");
+                System.out.println(jenkinsPath + " already exists and is not a directory.");
+                return;
+            }
+
+            try {
+                Files.createDirectories(jenkinsPath);
+                // TODO: jenkins class
+                createJenkinsProperties(jenkinsPropertiesPath, jenkinsName, destination);
+            } catch (IOException ex) {
+                System.err.println("Creating local copy of job configuration failed:" + ex.toString());
+                System.out.println("Creating local copy of job configuration failed:" + ex.toString());
+                return;
+            }
 
             if (Files.exists(jenkinsLibraryPath) && !Files.isDirectory(jenkinsLibraryPath)) {
                 System.err.println(jenkinsLibraryPath + " already exists and is not a directory.");
@@ -174,20 +195,43 @@ public abstract class TransferHandler implements Handler {
             try {
                 Files.createDirectories(jenkinsLibraryPath);
             } catch (IOException ex) {
-                System.err.println("Creating local copy of job configuration failed:" + ex.getMessage());
-                System.out.println("Creating local copy of job configuration failed:" + ex.getMessage());
+                System.err.println("Creating local copy of job configuration failed:" + ex.toString());
+                System.out.println("Creating local copy of job configuration failed:" + ex.toString());
                 return;
+            }
+
+            Path configPath = Paths.get(jenkinsLibraryPath.toString(), destination.entity());
+
+            if (force) {
+                try {
+                    Files.deleteIfExists(configPath);
+                } catch (IOException ex) {
+                    System.err.println("Could not delete a previous version of " + configPath + ":" + ex.toString());
+                    System.out.println("Could not delete a previous version of " + configPath + ":" + ex.toString());
+                }
             }
 
             // create the actual file
             try (FileWriter writer =
-                     new FileWriter(Files.createFile(Paths.get(jenkinsLibraryPath.toString(), destination.entity())).toFile())
+                     new FileWriter(Files.createFile(configPath).toFile())
             ) {
                 writer.write(xmlString);
             } catch (Exception ex) {
-                System.err.println("Creating local copy of job configuration failed:" + ex.getMessage());
-                System.out.println("Creating local copy of job configuration failed:" + ex.getMessage());
+                System.err.println("Creating local copy of job configuration failed:" + ex.toString());
+                System.out.println("Creating local copy of job configuration failed:" + ex.toString());
             }
+        }
+    }
+
+    private void createJenkinsProperties(Path jenkinsPropertiesPath, String jenkinsName, ConfigDestination destination) throws IOException {
+        if (Files.exists(jenkinsPropertiesPath)) {
+            return;
+        }
+
+        try (PrintWriter writer = new PrintWriter(new FileWriter(Files.createFile(jenkinsPropertiesPath).toFile()))) {
+            // TODO: constants
+            writer.println("name=" + jenkinsName);
+            writer.println("url=" + destination.jenkins().toString());
         }
     }
 

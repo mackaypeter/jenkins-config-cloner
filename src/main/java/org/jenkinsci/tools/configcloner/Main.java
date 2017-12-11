@@ -29,7 +29,9 @@ import org.jenkinsci.tools.configcloner.handler.CloneView;
 import org.jenkinsci.tools.configcloner.handler.DownloadJob;
 import org.jenkinsci.tools.configcloner.handler.Handler;
 import org.jenkinsci.tools.configcloner.handler.InvalidUsage;
+import org.jenkinsci.tools.configcloner.handler.PullHandler;
 import org.jenkinsci.tools.configcloner.handler.Recipe;
+import org.jenkinsci.tools.configcloner.handler.UpdateJob;
 import org.jenkinsci.tools.configcloner.handler.Usage;
 import org.kohsuke.args4j.CmdLineException;
 import org.kohsuke.args4j.CmdLineParser;
@@ -74,6 +76,8 @@ public class Main {
         addCommand(new CloneNode(config));
         addCommand(new Recipe(config, cliPool));
         addCommand(new DownloadJob(config));
+        addCommand(new UpdateJob(config));
+        addCommand(new PullHandler(config));
     }
 
     private void addCommand(final Handler handler) {
